@@ -1,4 +1,4 @@
-## Note: Hosts and Ports are now hardcoded.
+## Note: **Hosts and Ports are now hardcoded**
 
 Ensure that the client machine is 'eta' and that server machine is 'beta'.
 
