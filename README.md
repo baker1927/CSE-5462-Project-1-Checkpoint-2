@@ -1,3 +1,13 @@
+## Note: Hosts and Ports are now hardcoded.
+
+Ensure that the client machine is 'eta' and that server machine is 'beta'.
+
+Set client side troll port to 10001
+
+Set server side troll port to 10003
+
+tcpd now only takes one argument, 1 for client side, 0 for server side.
+
 #CSE 5462 Project 1
 
 Authors: James Baker, Eric Olson
