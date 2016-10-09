@@ -17,6 +17,7 @@
 #include <ctype.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <stdbool.h>
 
 /* Constants */
 #define MSS 1000
@@ -27,6 +28,7 @@
 #define CLIENTTROLLPORT 10001
 #define SERVERTROLLPORT 10003
 #define TCPDSERVERPORT 10002
+#define CBUFFERSIZE 64000 /* 64 KB buffer per spec */
 
 /* Structs used */
 
@@ -46,6 +48,8 @@ typedef struct MyMessage {
 	//int flag;	
 } MyMessage;
 
+
+//static char *cBuffer[CBUFFERSIZE];
 /* client/server to tcpd packet */
 //typedef struct tcpdHeader {
 //	size_t maxData;
