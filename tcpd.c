@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 
 		/* Initialize checksum table */	
 		crcInit();
-		
+
 		/* Prepare for select */
 		FD_ZERO(&selectmask);
 		FD_SET(local_sock, &selectmask);
@@ -127,45 +127,55 @@ int main(int argc, char *argv[])
 			/* Wait for data on socket from cleint */
 			if (FD_ISSET(local_sock, &selectmask)) {
 				
-				/* Receive data from the local socket */
-				amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
-				
-				printf("Received message from client.\n");
-					
-				/* Copy payload from client to tcpd packet */
-				bcopy(buffer, packet.body, amtFromClient);
-				
-				/* Pass along actualy bytes to be read from payload */
-				packet.bytes_to_read = amtFromClient;
+				int k = 0;
 
-				packet.chksum = 0;
-				packet.packNo = packNo;
+				/* Fill the buffer */
+				
+
+					/* Receive data from the local socket */
+					amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
+					
+					printf("Received message from client.\n");
+
+					/* TODO Push data to buffer */
+					//AddToBuffer((char *)&buffer);
+					
+					/* TODO Extract and forward data */
+					//RetrieveFromBuff()
+					
+					/* Copy payload from client to tcpd packet */
+					bcopy(buffer, packet.body, amtFromClient);
+				
+					packet.bytes_to_read = amtFromClient;
+
+					packet.chksum = 0;
+					packet.packNo = packNo;
 						
 
-				/* Calculate checksum */				
-				chksum = crcFast((char *)&packet,sizeof(packet));
-				printf("Checksum of packet: %X\n", chksum);
+					/* Calculate checksum */				
+					chksum = crcFast((char *)&packet,sizeof(packet));
+					printf("Checksum of packet: %X\n", chksum);
 
-				/* Attach checksum to troll packet */
-				/* This is checksum with chksum zerod out. Must do same on rec end */
-				packet.chksum = chksum;
+					/* Attach checksum to troll packet */
+					/* This is checksum with chksum zerod out. Must do same on rec end */
+					packet.chksum = chksum;
 
-				/* Prepare troll wrapper */
-				message.msg_pack = packet;
-				message.msg_header = destaddr;
+					/* Prepare troll wrapper */
+					message.msg_pack = packet;
+					message.msg_header = destaddr;
 
-				/* Send packet to troll */
-				amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
-				printf("Sent message to troll.\n\n");
-				if (amtToTroll != sizeof message) {
-					perror("totroll sendto");
-					exit(1);
-				}
+					/* Send packet to troll */
+					amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
+					printf("Sent message to troll.\n\n");
+					if (amtToTroll != sizeof message) {
+						perror("totroll sendto");
+						exit(1);
+					}
 
-				/* For bookkeeping/debugging */
-				total += amtToTroll;
-				packNo = packNo + 1;
-
+					/* For bookkeeping/debugging */
+					total += amtToTroll;
+					packNo = packNo + 1;
+				
 				//recvfrom(local_sock, (char *)&message, sizeof((char *)&message), 0, NULL, NULL);
 				//printf("ACK: %i\n\n", message.msg_pack.packNo);
 				//bzero(&message, sizeof(&message));
@@ -319,5 +329,7 @@ int main(int argc, char *argv[])
 		}
 	}
 }
+
+
 
 
