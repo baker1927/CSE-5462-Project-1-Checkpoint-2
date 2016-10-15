@@ -16,16 +16,17 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int sock;                     /* initial socket descriptor */
+	int sock, ackSock;                     /* initial socket descriptor */
 	int rval;                     /* returned value from a read */
 	int num_bytes;		      /* number of bytes of file to be sent */
 	int num_read;		      /* bytes read from file stream */
 	int num_sent_total = 0;
 	int num_sent = 0;
-	struct sockaddr_in sin_addr;  /* structure for socket name setup */
+	struct sockaddr_in sin_addr, clientaddr;  /* structure for socket name setup */
 	char * file_name = argv[1];   /* file name */
 	char buf[MSS] = {0};          /* bytes to send to server */
 	struct hostent *hp;	      /* host */
+	int ackFlag = 1;
 	
 	printf("%s\n\n", "TCP client preparing to send file...");
 
@@ -48,6 +49,21 @@ int main(int argc, char *argv[]) {
     		perror("Error connecting stream socket");
     		exit(1);
   	}
+	  
+	/* ACK SOCKET */
+	/* This creates a socket to communicate with the local tcpd process */
+	if ((ackSock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		perror("ackSock socket");
+			exit(1);
+	}
+	bzero((char *)&clientaddr, sizeof clientaddr);
+	clientaddr.sin_family = AF_INET;
+	clientaddr.sin_addr.s_addr = inet_addr(ETA); /* let the kernel fill this in */
+	clientaddr.sin_port = htons(10010);
+	if (bind(ackSock, (struct sockaddr *)&clientaddr, sizeof clientaddr) < 0) {
+		perror("ack bind");
+		exit(1);
+	}
   
   	/* Open file for transfer */
   	FILE *fp = fopen(file_name,"rb");
@@ -56,7 +72,7 @@ int main(int argc, char *argv[]) {
     		perror("Error opening file");
     		exit(1);  
   	}
-
+	  char ack[MSS] = {0};
   	/* Read number of bytes in file, rewind file to start index */  
 	fseek(fp, 0L, SEEK_END);
 	num_bytes = ftell(fp);
@@ -65,10 +81,16 @@ int main(int argc, char *argv[]) {
 	/* Send file size in 4 bytes */
 	SEND(sock, &num_bytes, MSS, 0);
 	printf("Sent size: %i bytes\n\n", num_bytes);
+	
+	RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
+	printf("Ack Recieved: %d\n\n", ackFlag);
 
 	/* Send file name in 20 bytes */
 	SEND(sock, file_name, MSS, 0);
 	printf("Sent name: %s\n\n", file_name);
+	
+	RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
+	printf("Ack Recieved: %d\n\n", ackFlag);
 
 	bzero(buf, sizeof(buf));
 
@@ -76,6 +98,9 @@ int main(int argc, char *argv[]) {
 	{
 		/* send buffer client side tcpd */
 		num_sent = SEND(sock, buf, num_read, 0);
+		
+	RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
+	printf("Ack Recieved: %d\n\n", ackFlag);
 
 		/* for bookkeeping */
 		num_sent_total += num_sent;
