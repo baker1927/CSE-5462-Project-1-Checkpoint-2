@@ -44,11 +44,12 @@ int main(int argc, char *argv[])
 		Packet packet;							/* Packet sent to server tcpd */
 		//tcpdHeader tcpd_head;						/* Packet type from client */
 		struct hostent *host; 						/* Hostname identifier */
-		struct sockaddr_in trolladdr, destaddr, localaddr, clientaddr, tcpdaddr;  /* Addresses */
+		struct sockaddr_in trolladdr, destaddr, localaddr, clientaddr, tcpdaddr, clientack;  /* Addresses */
 		fd_set selectmask; 						/* Socket descriptor for select */
 		int amtFromClient, amtToTroll, total = 0; 			/* Bookkeeping vars for sending */
 		int chksum = 0;							/* Checksum */
 		char buffer[MSS] = {0};
+		int ftpcAck = 1;
 		/* TROLL ADDRESSS */
 		/* this is the addr that troll is running on */
 
@@ -74,6 +75,13 @@ int main(int argc, char *argv[])
     		//bcopy(host->h_addr, (char*)&destaddr.sin_addr, host->h_length);
 		destaddr.sin_port = htons(TCPDSERVERPORT);
 		destaddr.sin_addr.s_addr = inet_addr(BETA);
+		
+		/* Client ack address */
+		bzero ((char *)&clientack, sizeof clientack);
+		clientack.sin_family = AF_INET;
+		//bcopy(host->h_addr, (char*)&clientack.sin_addr, host->h_length);
+		clientack.sin_port = htons(10010);
+		clientack.sin_addr.s_addr = inet_addr(ETA);
 
 		/* SOCKET TO TROLL */
 		/* This creates a socket to communicate with the local troll process */
@@ -118,7 +126,7 @@ int main(int argc, char *argv[])
 		FD_ZERO(&selectmask);
 		FD_SET(local_sock, &selectmask);
 	
-		
+		//char ack[MSS] = "ACK";
 		int packNo = 0;
 
 		/* Begin send loop */
@@ -127,14 +135,14 @@ int main(int argc, char *argv[])
 			/* Wait for data on socket from cleint */
 			if (FD_ISSET(local_sock, &selectmask)) {
 				
-				int k = 0;
+				//int k = 0;
 
 				/* Fill the buffer */
 				
 
 					/* Receive data from the local socket */
 					amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
-					
+					sendto(local_sock, (char*)&ftpcAck, sizeof ftpcAck, 0, (struct sockaddr *)&clientack, sizeof clientack);
 					printf("Received message from client.\n");
 
 					/* TODO Push data to buffer */
@@ -200,15 +208,15 @@ int main(int argc, char *argv[])
 		printf("%s\n\n", "Running on server machine...");		
 
 		int troll_sock;						/* a socket for sending messages and receiving responses */
-		int local_sock; 					/* a socket to communicate with the client process */
+		int local_sock, ackSock; 					/* a socket to communicate with the client process */
 		MyMessage message, clientMessage; 					/* recieved packet from remote troll process */
 		Packet clientPacket;		
-		struct sockaddr_in trolladdr, localaddr, serveraddr;    /* Addresses */
+		struct sockaddr_in trolladdr, localaddr, serveraddr, serverack;    /* Addresses */
 		struct hostent *host; 					/* Hostname identifier */
 		fd_set selectmask;					/* Socket descriptor for select */
 		int amtFromTcpd, amtToServer, len, total, amtToTcpd = 0; 		/* Bookkeeping vars */
 		int chksum, recv_chksum = 0;						/* Checksum */
-		char recvMessage[MSS] = "Remote troll has recieved packet.";
+		int ftpsAck = 1;					/* ftps ack */
 		
 		/* SOCKET FROM TROLL */
 		/* This is the socket to recieve from the troll running on the client machine */
@@ -224,12 +232,26 @@ int main(int argc, char *argv[])
 			perror("client bind");
 			exit(1);
 		}
-		
-
+	
 		/* SOCKET TO SERVER */
 		/* This creates a socket to communicate with the local troll process */
 		if ((local_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 			perror("client socket");
+			exit(1);
+		}
+		
+		/* FTPS ACK SOCKET */
+		/* This creates a socket to communicate with the local ftps process */
+		if ((ackSock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			perror("ackSock socket");
+				exit(1);
+		}
+		bzero((char *)&serverack, sizeof serverack);
+		serverack.sin_family = AF_INET;
+		serverack.sin_addr.s_addr = inet_addr(BETA); /* let the kernel fill this in */
+		serverack.sin_port = htons(10021);
+		if (bind(ackSock, (struct sockaddr *)&serverack, sizeof serverack) < 0) {
+			perror("ack bind");
 			exit(1);
 		}
 		
@@ -261,6 +283,7 @@ int main(int argc, char *argv[])
 		FD_ZERO(&selectmask);
 		FD_SET(troll_sock, &selectmask);
 
+	
 		/* Begin recieve loop */
 		for(;;) {
 		
@@ -280,20 +303,16 @@ int main(int argc, char *argv[])
 
 				printf("Recieved message from troll.\n");
 
-				/* Acknowledge recieved */
-				//usleep(10000);
-				/* Prepare troll wrapper */
-				bcopy(&recvMessage, &clientPacket.body, sizeof(clientPacket.body));
-				clientPacket.packNo = message.msg_pack.packNo;
-				clientMessage.msg_pack = clientPacket;
-				clientMessage.msg_header = clientaddr;
 				
-
+				/* Prepare troll wrapper */
+				//bcopy(&recvMessage, &clientPacket.body, sizeof(clientPacket.body));
+				//clientPacket.packNo = message.msg_pack.packNo;
+				//clientMessage.msg_pack = clientPacket;
+				//clientMessage.msg_header = clientaddr;
+				
 				/* Send packet to troll */
-				amtToTcpd = sendto(troll_sock, (char *)&clientMessage, sizeof clientMessage, 0, (struct sockaddr *)&servertrolladdr, sizeof servertrolladdr);
+				//amtToTcpd = sendto(troll_sock, (char *)&clientMessage, sizeof clientMessage, 0, (struct sockaddr *)&servertrolladdr, sizeof servertrolladdr);
 				//usleep(1000);
-
-
 
 				/* get checksum from packet */
 				recv_chksum = message.msg_pack.chksum;
@@ -318,6 +337,10 @@ int main(int argc, char *argv[])
 					//exit(1);
 				}
 				printf("Sent message to server.\n\n");
+				
+				/* Get ack from ftps */
+				recvfrom(ackSock, &ftpsAck, sizeof(ftpsAck), MSG_WAITALL, NULL, NULL);
+				printf("Ack Recieved: %d\n\n", ftpsAck);
 
 				/* Bookkeeping/Debugging */
 				total += amtFromTcpd;
