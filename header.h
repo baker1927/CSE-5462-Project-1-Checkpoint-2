@@ -48,14 +48,35 @@ typedef struct MyMessage {
 	//int flag;	
 } MyMessage;
 
+/* aux List node */
+struct node
+{
+	int start; /* Consider this the node start. Corresponds with MSS chunk in cBuffer 0-64000 */		
+	int nextB; /* Next chunk index, optional */
+	int pack;  /* Packet No. */
+	int bytes; /* Num of bytes read in from client */
+	int seq;   /* Sequence number */
+	int ack;   /* acknowledgement flag (0 = no, 1 = yes) */
+	float time;/* Time */
+	
+	struct node *next;
+};
 
-//static char *cBuffer[CBUFFERSIZE];
-/* client/server to tcpd packet */
-//typedef struct tcpdHeader {
-//	size_t maxData;
-//	char body[MSS];
-//	int bytes_to_read;
-//} tcpdHeader;
+/* aux list prototypes */
+void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, float time);
+void deleteNode(struct node *ptr, int start);
+void printList(struct node *ptr);
+struct node *findNode(struct node *ptr, int start);
+
+/* circular buffer properties */
+static char *cBuffer[CBUFFERSIZE];
+static int start = 0;
+static int end = 0;
+static int active = 0;
+char * GetFromBuffer();
+void AddToBuffer(char *p);
+int getStart();
+int getEnd();
 
 #endif
 
