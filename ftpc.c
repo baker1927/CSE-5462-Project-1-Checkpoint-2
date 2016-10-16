@@ -82,15 +82,17 @@ int main(int argc, char *argv[]) {
 	SEND(sock, &num_bytes, MSS, 0);
 	printf("Sent size: %i bytes\n\n", num_bytes);
 	
+	/* Rec ack */
 	RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
-	printf("Ack Recieved: %d\n\n", ackFlag);
+	//printf("Ack Recieved: %d\n\n", ackFlag);
 
 	/* Send file name in 20 bytes */
 	SEND(sock, file_name, MSS, 0);
 	printf("Sent name: %s\n\n", file_name);
 	
+	/* Rec ack */
 	RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
-	printf("Ack Recieved: %d\n\n", ackFlag);
+	//printf("Ack Recieved: %d\n\n", ackFlag);
 
 	bzero(buf, sizeof(buf));
 
@@ -99,8 +101,9 @@ int main(int argc, char *argv[]) {
 		/* send buffer client side tcpd */
 		num_sent = SEND(sock, buf, num_read, 0);
 		
-	RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
-	printf("Ack Recieved: %d\n\n", ackFlag);
+		/* Rec ack */
+		RECV(ackSock, &ackFlag, sizeof(ackFlag), MSG_WAITALL);
+		//printf("Ack Recieved: %d\n\n", ackFlag);
 
 		/* for bookkeeping */
 		num_sent_total += num_sent;
