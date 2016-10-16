@@ -18,6 +18,8 @@ double atof();
 #define Printf if (!qflag) (void)printf
 #define Fprintf (void)fprintf
 
+
+
 /* main */
 int main(int argc, char *argv[])
 {
@@ -115,8 +117,6 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		
-
 		/* SEND DATA TO TROLL */
 
 		/* Initialize checksum table */	
@@ -129,64 +129,76 @@ int main(int argc, char *argv[])
 		//char ack[MSS] = "ACK";
 		int packNo = 0;
 
+		struct node *start,*temp;
+        start = (struct node *)malloc(sizeof(struct node)); 
+        temp = start;
+        temp -> next = NULL;
+		int current = 0;
+		int next = 0;
+		
 		/* Begin send loop */
 		for(;;) {
 			
-			/* Wait for data on socket from cleint */
-			if (FD_ISSET(local_sock, &selectmask)) {
-				
-				//int k = 0;
-
-				/* Fill the buffer */
-				
-
-					/* Receive data from the local socket */
-					amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
-					sendto(local_sock, (char*)&ftpcAck, sizeof ftpcAck, 0, (struct sockaddr *)&clientack, sizeof clientack);
-					printf("Received message from client.\n");
-
-					/* TODO Push data to buffer */
-					//AddToBuffer((char *)&buffer);
+				/* Wait for data on socket from cleint */
+				if (FD_ISSET(local_sock, &selectmask)) {
 					
-					/* TODO Extract and forward data */
-					//RetrieveFromBuff()
+				/* Receive data from ftpc and copy to local buffer */
+				amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
+				printf("Received data from client.\n");
+				
+				/* Copy from local buffer to circular buffer */
+				AddToBuffer(buffer);
+				current = getStart();
+				next = getEnd();
+				printf("Copied data to buffer slot: %d\n", current);
+				
+				/* Update aux list info */
+				insertNode(temp, current, next, packNo, amtFromClient, 0, 0);
+				
+				/* Node to get info on current buffer slot */
+				struct node *ptr;
+				ptr = (struct node *)malloc(sizeof(struct node));
+				ptr -> next = NULL;
+				ptr = findNode(temp, current);
+				int bytesToSend = ptr->bytes;
+				
+				/* Send ack to ftpc after data written to buffer */
+				sendto(local_sock, (char*)&ftpcAck, sizeof ftpcAck, 0, (struct sockaddr *)&clientack, sizeof clientack);
+				
+				/* Copy payload from circular buffer to tcpd packet */
+				bcopy(GetFromBuffer(), packet.body, bytesToSend);
+				printf("Copied data to from buffer slot: %d\n", current);
+				
+				/* Prepare packet */
+				packet.bytes_to_read = bytesToSend;
+				packet.chksum = 0;
+				packet.packNo = packNo;
 					
-					/* Copy payload from client to tcpd packet */
-					bcopy(buffer, packet.body, amtFromClient);
+				/* Calculate checksum */				
+				chksum = crcFast((char *)&packet,sizeof(packet));
+				printf("Checksum of data: %X\n", chksum);
+	
+				/* Attach checksum to troll packet */
+				/* This is checksum with chksum zerod out. Must do same on rec end */
+				packet.chksum = chksum;
+	
+				/* Prepare troll wrapper */
+				message.msg_pack = packet;
+				message.msg_header = destaddr;
+	
+				/* Send packet to troll */
+				amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
+				printf("Sent message to troll.\n\n");
+				if (amtToTroll != sizeof message) {
+					perror("totroll sendto");
+					exit(1);
+				}
+	
+				/* For bookkeeping/debugging */
+				total += amtToTroll;
+				packNo = packNo + 1;
 				
-					packet.bytes_to_read = amtFromClient;
-
-					packet.chksum = 0;
-					packet.packNo = packNo;
-						
-
-					/* Calculate checksum */				
-					chksum = crcFast((char *)&packet,sizeof(packet));
-					printf("Checksum of packet: %X\n", chksum);
-
-					/* Attach checksum to troll packet */
-					/* This is checksum with chksum zerod out. Must do same on rec end */
-					packet.chksum = chksum;
-
-					/* Prepare troll wrapper */
-					message.msg_pack = packet;
-					message.msg_header = destaddr;
-
-					/* Send packet to troll */
-					amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
-					printf("Sent message to troll.\n\n");
-					if (amtToTroll != sizeof message) {
-						perror("totroll sendto");
-						exit(1);
-					}
-
-					/* For bookkeeping/debugging */
-					total += amtToTroll;
-					packNo = packNo + 1;
-				
-				//recvfrom(local_sock, (char *)&message, sizeof((char *)&message), 0, NULL, NULL);
-				//printf("ACK: %i\n\n", message.msg_pack.packNo);
-				//bzero(&message, sizeof(&message));
+				/* maybe unnesscary but working so why not? */
 				FD_ZERO(&selectmask);
 				FD_SET(local_sock, &selectmask);
 			} 
@@ -283,6 +295,12 @@ int main(int argc, char *argv[])
 		FD_ZERO(&selectmask);
 		FD_SET(troll_sock, &selectmask);
 
+		struct node *start,*temp;
+        start = (struct node *)malloc(sizeof(struct node)); 
+        temp = start;
+        temp -> next = NULL;
+		int current = 0;
+		int next = 0;
 	
 		/* Begin recieve loop */
 		for(;;) {
@@ -301,8 +319,7 @@ int main(int argc, char *argv[])
 					exit(1);
 				}
 
-				printf("Recieved message from troll.\n");
-
+				printf("Recieved data from troll.\n");
 				
 				/* Prepare troll wrapper */
 				//bcopy(&recvMessage, &clientPacket.body, sizeof(clientPacket.body));
@@ -322,25 +339,42 @@ int main(int argc, char *argv[])
 
 				/* Calculate checksum of packet recieved */
 				chksum = crcFast((char *)&message.msg_pack,sizeof(message.msg_pack));
-				printf("Checksum of message rec: %X\n", chksum);
+				printf("Checksum of data: %X\n", chksum);
 
 				/* Compare expected checksum to one caluclated above. Print Error if conflict. */
 				if (chksum != recv_chksum) {
 					printf("CHECKSUM ERROR: Expected: %X Actual: %X\n", recv_chksum, chksum);
 				}
 
+				/* Add body to circular buffer */
+				AddToBuffer(message.msg_pack.body);
+				current = getStart();
+				next = getEnd();
+				printf("Copied data to buffer slot: %d\n", current);
+				insertNode(temp, current, next, 0, message.msg_pack.bytes_to_read, 0, 0);
+				
+				/* Node to get info on current buffer slot */
+				struct node *ptr;
+				ptr = (struct node *)malloc(sizeof(struct node));
+				ptr -> next = NULL;
+				ptr = findNode(temp, current);
+				int bytesToSend = ptr->bytes;
+				
+				/* TODO send ack to client tcpd here */
+
 				/* Forward packet body to server */
-				amtToServer = sendto(local_sock, (char *)&message.msg_pack.body, message.msg_pack.bytes_to_read, 0, (struct sockaddr *)&destaddr, sizeof destaddr);
+				amtToServer = sendto(local_sock, (char *)GetFromBuffer(), bytesToSend, 0, (struct sockaddr *)&destaddr, sizeof destaddr);
 				if (amtToServer < 0) {
 					perror("totroll sendto");
 					/* To keep daemon running for grable demo */
 					//exit(1);
 				}
-				printf("Sent message to server.\n\n");
+				printf("Copied data from buffer slot: %d\n", current);
+				printf("Sent data to server.\n\n");
 				
 				/* Get ack from ftps */
 				recvfrom(ackSock, &ftpsAck, sizeof(ftpsAck), MSG_WAITALL, NULL, NULL);
-				printf("Ack Recieved: %d\n\n", ftpsAck);
+				//printf("Ack Recieved: %d\n\n", ftpsAck);
 
 				/* Bookkeeping/Debugging */
 				total += amtFromTcpd;
@@ -352,7 +386,4 @@ int main(int argc, char *argv[])
 		}
 	}
 }
-
-
-
 
