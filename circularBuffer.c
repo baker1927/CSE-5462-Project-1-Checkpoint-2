@@ -1,9 +1,6 @@
 #include"header.h"
 
-static char *cBuffer[CBUFFERSIZE];
-static int start = 0;
-static int end = 0;
-static int active = 0;
+/* Prototypes in header ^^^ */
 
 void AddToBuffer(char *p)
 {
@@ -49,6 +46,14 @@ int cBufferEmpty() {
 	else {
 		return 0;
 	}
+}
+
+int getStart() {
+	return start;
+}
+
+int getEnd() {
+	return end;
 }
 
 void displayBuffer() { /* Function to display status of Circular Queue */
