@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 				
 				/* Copy payload from circular buffer to tcpd packet */
 				bcopy(GetFromBuffer(), packet.body, bytesToSend);
-				printf("Copied data to from buffer slot: %d\n", current);
+				printf("Copied data from buffer slot: %d\n", current);
 				
 				/* Prepare packet */
 				packet.bytes_to_read = bytesToSend;
