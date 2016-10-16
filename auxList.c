@@ -1,41 +1,43 @@
 #include "header.h"
 
-struct node
-{
-	int start; /* Consider this the node start. Corresponds with MSS chunk in cBuffer 0-64000 */
-			
-	int nextB; /* Next chunk index, optional */
-	int pack;  /* Packet No. */
-	int bytes; /* Num of bytes read in from client */
-	int seq;   /* Sequence number */
-	int ack;   /* acknowledgement flag (0 = no, 1 = yes) */
-	float time;/* Time */
-	
-	struct node *next;
-};
+/* Prototypes in header ^^^ */
 
 /* Inserts a new node to the linked list that holds information about a MSS chunck of cBuffer */
 /* Start should correspond with the start index of the array element */
+/* Searches to see if node at start address exists and if so updates it's properties. O/w a new node is created. */
 void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, float time)
 {
-        while(ptr->next!=NULL)
-        {
-                ptr = ptr -> next;
+        struct node* exist_node = (struct node *)malloc(sizeof(struct node));
+        exist_node = findNode(ptr, start);
+        
+        if (exist_node == NULL) {
+        
+                while(ptr->next!=NULL)
+                {
+                        ptr = ptr -> next;
+                }
+                /* Allocate memory for the new node and put start in it.*/
+                ptr->next = (struct node *)malloc(sizeof(struct node));
+                ptr = ptr->next;
+        
+                /* Fill contents */
+                ptr->start = start;
+                ptr->nextB = nextB;
+                ptr->pack = pack;
+                ptr->bytes = bytes;
+                ptr->seq = seq;
+                ptr->time = time;
+                
+                /* point to end */
+                ptr->next = NULL;
+        } else { /* Node exists so reassign properties */
+                exist_node->pack = pack;
+                exist_node->bytes = bytes;
+                exist_node->seq = seq;
+                exist_node->time = time;
         }
-        /* Allocate memory for the new node and put start in it.*/
-        ptr->next = (struct node *)malloc(sizeof(struct node));
-        ptr = ptr->next;
-
-	/* Fill contents */
-	ptr->start = start;
-	ptr->nextB = nextB;
-	ptr->pack = pack;
-	ptr->bytes = bytes;
-	ptr->seq = seq;
-	ptr->time = time;
-	
-	/* point to end */
-        ptr->next = NULL;
+        
+        
 }
 
 /* Deletes node with a specific start index */
@@ -65,10 +67,12 @@ void deleteNode(struct node *ptr, int start)
 /* Does not remove node */
 struct node *findNode(struct node *ptr, int start)
 {
-        ptr =  ptr -> next;
+        
+        ptr = ptr -> next;
 
         while(ptr!=NULL)
         {
+                
                 if(ptr->start == start)
                 {
                         return ptr;
