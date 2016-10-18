@@ -219,8 +219,12 @@ int main(int argc, char *argv[])
 				/*-------------------------------v----------------------------*/
 				
 				//get time
-				//store it in the auxList node
-				//In the future, start timer for this packet with value RTO
+				//struct timespec requestStart;
+				//clock_gettime(CLOCK_REALTIME, &requestStart);
+
+				//store it in the auxList node as the time value
+
+				//In the future, start a new timer for this packet with value RTO
 
 				/*------------------------------^-----------------------------*/
 	
@@ -255,8 +259,20 @@ int main(int argc, char *argv[])
 			//we are receiving an ACK from the receiver
 			if (FD_ISSET(rcvr_sock, &selectmask)) {
 				printf("RECEIVED AN ACK ON THE CLIENT SIDE TCPD\n");
-				//printf("Received an ACK for packet %d", ...);
+
+				//get the packet's number
+				//int ackNo = ...;
+
+				//printf("Received an ACK for packet %d\n", ackNo);
+
+				struct timespec requestEnd;
+				clock_gettime(CLOCK_REALTIME, &requestEnd);
+
 				//get current time from corresponding auxList node
+				//findNode(); ..
+
+				
+
 				//calculate time elapsed
 				//calculate_rto();
 				//printf("The RTO has been updated to %d", ...);
