@@ -4,7 +4,7 @@
 / Project 1 - Checkpoint 1 - September 29, 2016
 / 
 / This file contains our tcpd daemon implementation
-/ Note: /* CRC algorithm used from public domain implmentation from
+/ Note: CRC algorithm used from public domain implmentation from
 / http://www.barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
 */
 
@@ -117,6 +117,29 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
+		/*-------------------------------V------------------------------------*/
+
+		//Will become uneccessary
+
+		//Create a socket to listen for ACK messages from the server side tcpd on
+		int rcvr_sock;
+		if((rcvr_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			perror("rcvr_sock socket");
+			exit(1);
+		}
+		//bind information to this socket
+		struct sockaddr_in client_ack_addr;
+		bzero((char *)&client_ack_addr, sizeof client_ack_addr);
+		client_ack_addr.sin_family = AF_INET;
+		client_ack_addr.sin_addr.s_addr = inet_addr(LOCALADDRESS); /* let the kernel fill this in */
+		client_ack_addr.sin_port = htons(9898);
+		if (bind(local_sock, (struct sockaddr *)&client_ack_addr, sizeof client_ack_addr) < 0) {
+			perror("client_ack_addr bind");
+			exit(1);
+		}
+
+		/*----------------------------------^---------------------------------*/
+
 		/* SEND DATA TO TROLL */
 
 		/* Initialize checksum table */	
@@ -125,6 +148,13 @@ int main(int argc, char *argv[])
 		/* Prepare for select */
 		FD_ZERO(&selectmask);
 		FD_SET(local_sock, &selectmask);
+
+		/*---------------------------------V----------------------------------*/
+
+		//Will become uneccessary
+		FD_SET(rcvr_sock, &selectmask);
+
+		/*--------------------------------^-----------------------------------*/
 	
 		//char ack[MSS] = "ACK";
 		int packNo = 0;
@@ -139,8 +169,8 @@ int main(int argc, char *argv[])
 		/* Begin send loop */
 		for(;;) {
 			
-				/* Wait for data on socket from cleint */
-				if (FD_ISSET(local_sock, &selectmask)) {
+			/* Wait for data on socket from cleint */
+			if (FD_ISSET(local_sock, &selectmask)) {
 					
 				/* Receive data from ftpc and copy to local buffer */
 				amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
@@ -185,6 +215,14 @@ int main(int argc, char *argv[])
 				/* Prepare troll wrapper */
 				message.msg_pack = packet;
 				message.msg_header = destaddr;
+
+				/*-------------------------------v----------------------------*/
+				
+				//get time
+				//store it in the auxList node
+				//In the future, start timer for this packet with value RTO
+
+				/*------------------------------^-----------------------------*/
 	
 				/* Send packet to troll */
 				amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
@@ -201,11 +239,45 @@ int main(int argc, char *argv[])
 				/* maybe unnesscary but working so why not? */
 				FD_ZERO(&selectmask);
 				FD_SET(local_sock, &selectmask);
-			} 
+				/*--------------------------------v---------------------------*/
+
+				//Will become uneccessary
+				FD_SET(rcvr_sock, &selectmask);
+		
+				/*---------------------------------^--------------------------*/
+		
+			}
+
+			/*----------------------------------v-----------------------------*/
+			
+			//This will become unnecessary
+
+			//we are receiving an ACK from the receiver
+			if (FD_ISSET(rcvr_sock, &selectmask)) {
+				printf("RECEIVED AN ACK ON THE CLIENT SIDE TCPD\n");
+				//printf("Received an ACK for packet %d", ...);
+				//get current time from corresponding auxList node
+				//calculate time elapsed
+				//calculate_rto();
+				//printf("The RTO has been updated to %d", ...);
+				//delete auxList node for that packet
+
+
+				//In the future, we will also update the sliding window here
+			}
+
+			/*--------------------------------^-------------------------------*/ 
 
 		/* Reset socket descriptor for select */
 		FD_ZERO(&selectmask);
 		FD_SET(local_sock, &selectmask);
+
+		/*-------------------------------------v------------------------------*/
+
+		//Will become uneccessary
+		FD_SET(rcvr_sock, &selectmask);
+		
+		/*---------------------------------------^----------------------------*/
 		}
 		
 	/* Run on server side */
@@ -278,6 +350,28 @@ int main(int argc, char *argv[])
 		clientaddr.sin_family = htons(AF_INET);
 		clientaddr.sin_port = htons(9999);
 		clientaddr.sin_addr.s_addr = inet_addr(ETA);
+
+		/*---------------------------------V----------------------------------*/
+
+		//This will be uneccessary. Will just send acks to the one socket on
+		//the client side. No need for a separate socket
+
+		//The information for the socket that ack messages will be sent to
+		/*ADDRESS OF CLIENT TCPD ACK SOCKET*/
+		struct sockaddr_in clientaddr_ack;
+		clientaddr.sin_family = htons(AF_INET);
+		clientaddr.sin_port = htons(9898);
+		clientaddr.sin_addr.s_addr = inet_addr(ETA);
+
+		//create a socket for sending ACKS directly to the client tcpd
+		//In the future we will need to send acks to troll instead
+		int cli_tcpd_sock;
+		if((cli_tcpd_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			perror("cli_tcpd_sock socket");
+			exit(1);
+		}
+
+		/*----------------------------------^---------------------------------*/
 
 		/* TROLL ADDRESSS */
 		struct sockaddr_in servertrolladdr;
@@ -361,6 +455,27 @@ int main(int argc, char *argv[])
 				int bytesToSend = ptr->bytes;
 				
 				/* TODO send ack to client tcpd here */
+
+				/*-----------------------------v------------------------------*/
+
+				//This section will need to be changed to send through the
+				//server side troll
+
+				//create an ACK response packet
+				Packet ack_pack;
+				bzero ((char *)&ack_pack, sizeof ack_pack);
+				ack_pack.packNo = message.msg_pack.packNo;
+
+				//Send to the client's tcpd (directly for now)
+				int tempAmt = sendto(cli_tcpd_sock, (char*)&ack_pack, sizeof(ack_pack), 0, (struct sockaddr *)&clientaddr_ack, sizeof(clientaddr_ack));
+				if (tempAmt < 0) {
+					perror("ack to client tcpd sendto");
+					exit(1);
+				}
+				printf("JUST SENT THE ACK TO CLIENT TCPD\n");
+				 
+
+				/*-------------------------------^----------------------------*/
 
 				/* Forward packet body to server */
 				amtToServer = sendto(local_sock, (char *)GetFromBuffer(), bytesToSend, 0, (struct sockaddr *)&destaddr, sizeof destaddr);

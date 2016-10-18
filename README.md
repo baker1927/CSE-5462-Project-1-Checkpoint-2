@@ -36,7 +36,7 @@ server process.
 
 ###Checkpoint 1 Updates:
 
-The checksum of packetes sent/received on the tcpd daemon on calculated. If 
+The checksum of packets sent/received on the tcpd daemon on calculated. If 
 they do not match the tcpd server prints an error.
 
 The timer and driver processes work as required.

@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdbool.h>
+#include "ewma.h"
 
 /* Constants */
 #define MSS 1000
