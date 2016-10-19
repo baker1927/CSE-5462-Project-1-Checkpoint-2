@@ -3,10 +3,6 @@ int main(int argc, char *argv[]) {
 	
 	printf("%s\n\n", "Running on server machine...");	
 
-
-	struct hostent *host; 					/* Hostname identifier */	
-	fd_set selectmask;					/* Socket descriptor for select */	
-
 	/*----------------------vvvvvvvv------------------------------------------*/	
 	/* Here we are creating a socket for sending and receiving messages between 
 	processes on the same machine. */	
@@ -55,13 +51,15 @@ int main(int argc, char *argv[]) {
 	/* Here we are establishing more addresses that we will be using */
 
 	/* This is the address of the local FTPS */
-	struct sockaddr_in destaddr;
-	destaddr.sin_family = AF_INET;
-	destaddr.sin_port = htons(LOCALPORT);
-	destaddr.sin_addr.s_addr = inet_addr(LOCALADDRESS);
+	struct sockaddr_in ftps_addr;
+	bzero ((char *)&ftps_addr, sizeof ftps_addr);
+	ftps_addr.sin_family = AF_INET;
+	ftps_addr.sin_port = htons(LOCALPORT);
+	ftps_addr.sin_addr.s_addr = inet_addr(LOCALADDRESS);
 
 	/* This is the address of the client side TCPD */
 	struct sockaddr_in client_tcpd_addr;
+	bzero ((char *)&client_tcpd_addr, sizeof client_tcpd_addr);
 	client_tcpd_addr.sin_family = htons(AF_INET);
 	client_tcpd_addr.sin_port = htons(9999);
 	client_tcpd_addr.sin_addr.s_addr = inet_addr(ETA);
@@ -75,17 +73,10 @@ int main(int argc, char *argv[]) {
 
 	/*----------------------^^^^^^^^------------------------------------------*/
 		
-		
-	/* RECEIVE DATA */
-
 	/* Initialize checksum table */		
 	crcInit();
-
-	/* Prepare descriptor*/
-	FD_ZERO(&selectmask);
-	FD_SET(network_sock, &selectmask);
-	FD_SET(local_sock, &selectmask);	
-
+	
+	fd_set selectmask;					/* Socket descriptor for select */
 
 	for(;;) {
 
