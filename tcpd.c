@@ -150,6 +150,11 @@ int main(int argc, char *argv[])
 		int current = 0;
 		int next = 0;
 		int ack = 0;
+		int firstSend = 1; 
+
+		double est_rtt = 2.0;
+		double est_var = 0.0;
+		double rto = 3.0;
 		
 		/* Begin send loop */
 		for(;;) {
@@ -169,7 +174,8 @@ int main(int argc, char *argv[])
 				printf("Copied data to buffer slot: %d\n", current);
 				
 				/* Update aux list info */
-				insertNode(temp, current, next, packNo, amtFromClient, 0, 0);
+				struct timespec temp_t;
+				insertNode(temp, current, next, packNo, amtFromClient, 0, temp_t);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
@@ -199,6 +205,14 @@ int main(int argc, char *argv[])
 				/* Prepare troll wrapper */
 				message.msg_pack = packet;
 				message.msg_header = destaddr;
+
+				/***************************************/
+
+				struct timespec startTime;
+				clock_gettime(CLOCK_MONOTONIC, &startTime);
+				ptr->time = startTime;
+
+				/***************************************/
 	
 				/* Send packet to troll */
 
@@ -214,21 +228,42 @@ int main(int argc, char *argv[])
 				recvfrom(ackSock, &ack, sizeof ack, MSG_WAITALL, NULL, NULL);				
 				printf("**Ack Recieved: %d**\n\n", ack);
 				
-				/* *******WE JUST GOT AN ACK HERE MUH DUDE!!!! DO RTT SHIT HERE YO *********/
-				
-				
-				//find the node that represents the packet that was just acked
-				/*struct acked_node = findNode(head, ack.packNo);
+				/*****************/
 				
 				struct timespec endTime;
-				clock_gettime(CLOCK_REALTIME, &endTime);
+				clock_gettime(CLOCK_MONOTONIC, &endTime);
 
-    			double elapsed = ( endTime.tv_sec - acked_node.time->.tv_sec )
-  				+ ( endTime.tv_nsec - acked_node.time->.tv_nsec )
-  				/ 1E9;
+				//find the node that represents the packet that was just acked
+				struct node * acked_node = findNode(temp, ack);
 				
-				calculate_rto(elapsed);
-				printf("JUST CALCULATED THE RTO. NEW RTO IS: %f\n", rto);*/
+				if (NULL != acked_node) {				
+						
+					double elapsed = ( endTime.tv_sec - acked_node->time.tv_sec )
+  					+ ( endTime.tv_nsec - acked_node->time.tv_nsec )
+  					/ 1E9;
+					
+					if (firstSend == 1){
+						est_rtt = elapsed;
+						est_var = elapsed/2.0;
+						rto = est_rtt + 4.0 * est_var;
+						firstSend = 0;
+					} else {
+						//calculate_rto(elapsed);
+						est_rtt = (0.875 * elapsed) + (1 - 0.875) * est_rtt;
+						est_var = (1 - 0.25) * est_var + 0.25 * abs((est_rtt - elapsed));
+						rto = est_rtt + 4.0 * est_var; 
+						
+					}	
+
+					/*printf("Elapsed: %f\n", elapsed);
+					printf("Ack: %d Node: %d\n", ack, acked_node->start);
+					printf("RTO: %.9f\n", rto);
+					printf("RTT: %.9f\n", est_rtt);
+					printf("VAR: %.9f\n\n", est_var);*/
+					
+				} else {
+					printf("ACKED NODE IS NULL\n");
+				}
 				
 				
 				
@@ -398,7 +433,8 @@ int main(int argc, char *argv[])
 				current = getStart();
 				next = getEnd();
 				printf("Copied data to buffer slot: %d\n", current);
-				insertNode(temp, current, next, 0, packet.bytes_to_read, 0, 0);
+				struct timespec temp_t_2;
+				insertNode(temp, current, next, 0, packet.bytes_to_read, 0, temp_t_2);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
@@ -427,3 +463,10 @@ int main(int argc, char *argv[])
 		}
 	}
 }
+
+/*double calculate_rto(double samp_rtt) {
+	est_rtt = ALPHA * samp_rtt + (1 - ALPHA) * est_rtt;
+	est_var = (1 - RHO) * est_var + RHO * abs((samp_rtt - est_var));
+	rto = est_rtt + 4.0 * est_var; 
+	return rto;
+}*/
