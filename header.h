@@ -8,7 +8,8 @@
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/socket.h>
-#include <sys/time.h>
+//#include <sys/time.h>
+#include <time.h>
 #include <sys/param.h>
 #include <sys/select.h>
 #include <sys/stat.h>
@@ -29,6 +30,8 @@
 #define SERVERTROLLPORT 10003
 #define TCPDSERVERPORT 10002
 #define CBUFFERSIZE 64000 /* 64 KB buffer per spec */
+#define ALPHA 0.875
+#define RHO 0.25
 
 /* Structs used */
 
@@ -38,6 +41,7 @@ typedef struct Packet {
 	int bytes_to_read;
 	int chksum;
 	int packNo;
+	int startNo;
 	//add additional vars here
 } Packet;
 
@@ -57,22 +61,24 @@ struct node
 	int bytes; /* Num of bytes read in from client */
 	int seq;   /* Sequence number */
 	int ack;   /* acknowledgement flag (0 = no, 1 = yes) */
-	float time;/* Time */
+	struct timespec time;/* Time */
 	
 	struct node *next;
 };
 
 /* aux list prototypes */
-void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, float time);
+void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, struct timespec time);
 void deleteNode(struct node *ptr, int start);
 void printList(struct node *ptr);
 struct node *findNode(struct node *ptr, int start);
+double calculate_rto(double sample_rtt);
 
 /* circular buffer properties */
 static char *cBuffer[CBUFFERSIZE];
 static int start = 0;
 static int end = 0;
 static int active = 0;
+
 char * GetFromBuffer();
 void AddToBuffer(char *p);
 int getStart();
