@@ -9,6 +9,8 @@
 #include <sys/signal.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <time.h>
+//#include "ewma.h"
 #include <sys/param.h>
 #include <sys/select.h>
 #include <sys/stat.h>
@@ -29,6 +31,9 @@
 #define SERVERTROLLPORT 10003
 #define TCPDSERVERPORT 10002
 #define CBUFFERSIZE 64000 /* 64 KB buffer per spec */
+//for rtt rto stuff
+#define ALPHA 0.875
+#define RHO 0.25
 
 /* Structs used */
 
@@ -57,13 +62,13 @@ struct node
 	int bytes; /* Num of bytes read in from client */
 	int seq;   /* Sequence number */
 	int ack;   /* acknowledgement flag (0 = no, 1 = yes) */
-	float time;/* Time */
+	struct timespec time;/* Time */
 	
 	struct node *next;
 };
 
 /* aux list prototypes */
-void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, float time);
+void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, struct timespec time);
 void deleteNode(struct node *ptr, int start);
 void printList(struct node *ptr);
 struct node *findNode(struct node *ptr, int start);
@@ -73,10 +78,18 @@ static char *cBuffer[CBUFFERSIZE];
 static int start = 0;
 static int end = 0;
 static int active = 0;
+//for rtt rto stuff
+static double est_rtt = 2.0;
+static double est_var = 0.0;
+static double rto = 1.0;
+
 char * GetFromBuffer();
 void AddToBuffer(char *p);
 int getStart();
 int getEnd();
+//for rtt rto stuff
+double calculate_rto(double sample_rtt);
+
 
 #endif
 

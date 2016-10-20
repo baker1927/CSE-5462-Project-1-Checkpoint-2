@@ -169,7 +169,8 @@ int main(int argc, char *argv[])
 				printf("Copied data to buffer slot: %d\n", current);
 				
 				/* Update aux list info */
-				insertNode(temp, current, next, packNo, amtFromClient, 0, 0);
+				struct timespec t_temp;
+				insertNode(temp, current, next, packNo, amtFromClient, 0, t_temp);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
@@ -198,7 +199,17 @@ int main(int argc, char *argv[])
 				/* Prepare troll wrapper */
 				message.msg_pack = packet;
 				message.msg_header = destaddr;
-	
+
+				/*********************************Dis project doe*****************/
+
+				//struct node * temp_node = findNode(temp, current);
+				struct timespec startTime;
+				clock_gettime(CLOCK_REALTIME, &startTime);
+				//temp_node->time = startTime;
+				ptr->time = startTime;
+
+				/*****************************************************************/
+
 				/* Send packet to troll */
 
 				amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
@@ -217,17 +228,19 @@ int main(int argc, char *argv[])
 				
 				
 				//find the node that represents the packet that was just acked
-				struct acked_node = findNode(head, ack.packNo);
+				struct node * acked_node = findNode(temp, ack);
+				if(NULL != acked_node) {
 				
-				struct timespec endTime;
-				clock_gettime(CLOCK_REALTIME, &endTime);
+					struct timespec endTime;
+					clock_gettime(CLOCK_REALTIME, &endTime);
 
-    			double elapsed = ( endTime.tv_sec - acked_node.time->.tv_sec )
-  				+ ( endTime.tv_nsec - acked_node.time->.tv_nsec )
-  				/ 1E9;
+    				double elapsed = ( endTime.tv_sec - acked_node->time.tv_sec )
+  					+ ( endTime.tv_nsec - acked_node->time.tv_nsec )
+  					/ 1E9;
 				
-				calculate_rto(elapsed);
-				printf("JUST CALCULATED THE RTO. NEW RTO IS: %f\n", rto);
+					calculate_rto(elapsed);
+					printf("RTT is: %f. DEVIATION IS %f. JUST CALCULATED THE RTO. NEW RTO IS: %f\n", est_rtt, est_var, rto);
+				}
 				
 				
 				
@@ -391,7 +404,8 @@ int main(int argc, char *argv[])
 				current = getStart();
 				next = getEnd();
 				printf("Copied data to buffer slot: %d\n", current);
-				insertNode(temp, current, next, 0, message.msg_pack.bytes_to_read, 0, 0);
+				struct timespec t;
+				insertNode(temp, current, next, 0, message.msg_pack.bytes_to_read, 0, t);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
