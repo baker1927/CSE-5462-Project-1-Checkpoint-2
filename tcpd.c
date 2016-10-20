@@ -186,6 +186,7 @@ int main(int argc, char *argv[])
 				packet.bytes_to_read = bytesToSend;
 				packet.chksum = 0;
 				packet.packNo = packNo;
+				packet.startNo = current;
 					
 				/* Calculate checksum */				
 				chksum = crcFast((char *)&packet,sizeof(packet));
@@ -217,7 +218,7 @@ int main(int argc, char *argv[])
 				
 				
 				//find the node that represents the packet that was just acked
-				struct acked_node = findNode(head, ack.packNo);
+				/*struct acked_node = findNode(head, ack.packNo);
 				
 				struct timespec endTime;
 				clock_gettime(CLOCK_REALTIME, &endTime);
@@ -227,7 +228,7 @@ int main(int argc, char *argv[])
   				/ 1E9;
 				
 				calculate_rto(elapsed);
-				printf("JUST CALCULATED THE RTO. NEW RTO IS: %f\n", rto);
+				printf("JUST CALCULATED THE RTO. NEW RTO IS: %f\n", rto);*/
 				
 				
 				
@@ -262,7 +263,7 @@ int main(int argc, char *argv[])
 		int troll_sock;						/* a socket for sending messages and receiving responses */
 		int local_sock, ackSock; 					/* a socket to communicate with the client process */
 		MyMessage message, clientMessage; 					/* recieved packet from remote troll process */
-		Packet clientPacket;		
+		Packet packet;		
 		struct sockaddr_in trolladdr, localaddr, serveraddr, serverack, masterAck;    /* Addresses */
 		struct hostent *host; 					/* Hostname identifier */
 		fd_set selectmask;					/* Socket descriptor for select */
@@ -347,6 +348,7 @@ int main(int argc, char *argv[])
         temp -> next = NULL;
 		int current = 0;
 		int next = 0;
+		int ack = 0;
 	
 		/* Begin recieve loop */
 		for(;;) {
@@ -366,15 +368,18 @@ int main(int argc, char *argv[])
 				}
 
 				printf("Recieved data from troll.\n");
-
+				
+				/* Copy packet locally */
+				bcopy(&message.msg_pack, &packet, sizeof(packet));
 				/* get checksum from packet */
-				recv_chksum = message.msg_pack.chksum;
-
+				//recv_chksum = message.msg_pack.chksum;
+				recv_chksum = packet.chksum;
+			
 				/* zero checksum to make equal again */
-				message.msg_pack.chksum = 0;
-
+				packet.chksum = 0;
+				
 				/* Calculate checksum of packet recieved */
-				chksum = crcFast((char *)&message.msg_pack,sizeof(message.msg_pack));
+				chksum = crcFast((char *)&packet, sizeof(packet));
 				printf("Checksum of data: %X\n", chksum);
 
 				/* Compare expected checksum to one caluclated above. Print Error if conflict. */
@@ -383,15 +388,17 @@ int main(int argc, char *argv[])
 				}
 				
 				/* SEND ACK TO CLIENT TCPD */
-				int ack = 1;
-				sendto(local_sock, &ack, ack, 0, (struct sockaddr *)&masterAck, sizeof masterAck);
+				
+				//int ack = message.msg_pack.startNo;
+				ack = packet.startNo;
+				sendto(local_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&masterAck, sizeof masterAck);
 
 				/* Add body to circular buffer */
-				AddToBuffer(message.msg_pack.body);
+				AddToBuffer(packet.body);
 				current = getStart();
 				next = getEnd();
 				printf("Copied data to buffer slot: %d\n", current);
-				insertNode(temp, current, next, 0, message.msg_pack.bytes_to_read, 0, 0);
+				insertNode(temp, current, next, 0, packet.bytes_to_read, 0, 0);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
@@ -420,4 +427,3 @@ int main(int argc, char *argv[])
 		}
 	}
 }
-
