@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdbool.h>
+#include <time.h>
 #include "ewma.h"
 
 /* Constants */
@@ -58,13 +59,13 @@ struct node
 	int bytes; /* Num of bytes read in from client */
 	int seq;   /* Sequence number */
 	int ack;   /* acknowledgement flag (0 = no, 1 = yes) */
-	float time;/* Time */
+	struct timespec* time;/* Time */
 	
 	struct node *next;
 };
 
 /* aux list prototypes */
-void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, float time);
+void insertNode(struct node *ptr, int start, int nextB, int pack, int bytes, int seq, struct timespec* time);
 void deleteNode(struct node *ptr, int start);
 void printList(struct node *ptr);
 struct node *findNode(struct node *ptr, int start);

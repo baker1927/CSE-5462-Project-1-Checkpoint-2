@@ -15,6 +15,7 @@
 /* for lint */
 void bzero(), bcopy(), exit(), perror();
 double atof();
+#define ACKPORT 9898
 #define Printf if (!qflag) (void)printf
 #define Fprintf (void)fprintf
 
@@ -41,7 +42,7 @@ int main(int argc, char *argv[])
 
 		int troll_sock;							/* a socket for sending messages to the local troll process */
 		int local_sock; 						/* a socket to communicate with the client process */
-		int tcpd_sock;					
+		int ack_sock;					
 		MyMessage message; 						/* Packet sent to troll process */
 		Packet packet;							/* Packet sent to server tcpd */
 		//tcpdHeader tcpd_head;						/* Packet type from client */
@@ -132,8 +133,8 @@ int main(int argc, char *argv[])
 		bzero((char *)&client_ack_addr, sizeof client_ack_addr);
 		client_ack_addr.sin_family = AF_INET;
 		client_ack_addr.sin_addr.s_addr = inet_addr(LOCALADDRESS); /* let the kernel fill this in */
-		client_ack_addr.sin_port = htons(9898);
-		if (bind(local_sock, (struct sockaddr *)&client_ack_addr, sizeof client_ack_addr) < 0) {
+		client_ack_addr.sin_port = htons(ACKPORT);
+		if (bind(rcvr_sock, (struct sockaddr *)&client_ack_addr, sizeof(client_ack_addr)) < 0) {
 			perror("client_ack_addr bind");
 			exit(1);
 		}
@@ -183,7 +184,9 @@ int main(int argc, char *argv[])
 				printf("Copied data to buffer slot: %d\n", current);
 				
 				/* Update aux list info */
-				insertNode(temp, current, next, packNo, amtFromClient, 0, 0);
+				////////////////////////////
+				struct timespec t;
+				insertNode(temp, current, next, packNo, amtFromClient, 0, &t);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
@@ -223,6 +226,10 @@ int main(int argc, char *argv[])
 				//clock_gettime(CLOCK_REALTIME, &requestStart);
 
 				//store it in the auxList node as the time value
+				//struct cur_node = findNode(ptr, current);
+				//if(NULL != cur_node) {
+				//	cur_node.time = requestStart;
+				//}
 
 				//In the future, start a new timer for this packet with value RTO
 
@@ -265,18 +272,24 @@ int main(int argc, char *argv[])
 
 				//printf("Received an ACK for packet %d\n", ackNo);
 
-				struct timespec requestEnd;
-				clock_gettime(CLOCK_REALTIME, &requestEnd);
+				// struct timespec requestEnd;
+				// clock_gettime(CLOCK_REALTIME, &requestEnd);
 
-				//get current time from corresponding auxList node
-				//findNode(); ..
+				// //get current time from corresponding auxList node
+				// //struct temp_node = findNode(ptr, ackNo); 
+				// double accum;
+				// if(NULL !== temp_node) {
+				// 	accum = ( requestEnd.tv_sec - requestStart.tv_sec )
+  		// 			+ ( requestEnd.tv_nsec - requestStart.tv_nsec )
+  		// 			/ 1E9;
+				// }
 
 				
 
-				//calculate time elapsed
-				//calculate_rto();
-				//printf("The RTO has been updated to %d", ...);
-				//delete auxList node for that packet
+				// //calculate time elapsed
+				// calculate_rto(accum);
+				// printf("The RTO has been updated to %d", ...);
+				// //delete auxList node for that packet
 
 
 				//In the future, we will also update the sliding window here
@@ -461,7 +474,8 @@ int main(int argc, char *argv[])
 				current = getStart();
 				next = getEnd();
 				printf("Copied data to buffer slot: %d\n", current);
-				insertNode(temp, current, next, 0, message.msg_pack.bytes_to_read, 0, 0);
+				struct timespec t2;
+				insertNode(temp, current, next, 0, message.msg_pack.bytes_to_read, 0, &t2);
 				
 				/* Node to get info on current buffer slot */
 				struct node *ptr;
