@@ -18,8 +18,6 @@ double atof();
 #define Printf if (!qflag) (void)printf
 #define Fprintf (void)fprintf
 
-
-
 /* main */
 int main(int argc, char *argv[])
 {
@@ -41,12 +39,13 @@ int main(int argc, char *argv[])
 
 		int troll_sock;							/* a socket for sending messages to the local troll process */
 		int local_sock; 						/* a socket to communicate with the client process */
-		int tcpd_sock;					
+		int tcpd_sock;
+		int ackSock;					
 		MyMessage message; 						/* Packet sent to troll process */
 		Packet packet;							/* Packet sent to server tcpd */
 		//tcpdHeader tcpd_head;						/* Packet type from client */
 		struct hostent *host; 						/* Hostname identifier */
-		struct sockaddr_in trolladdr, destaddr, localaddr, clientaddr, tcpdaddr, clientack;  /* Addresses */
+		struct sockaddr_in trolladdr, destaddr, localaddr, clientaddr, tcpdaddr, clientack, masterAck;  /* Addresses */
 		fd_set selectmask; 						/* Socket descriptor for select */
 		int amtFromClient, amtToTroll, total = 0; 			/* Bookkeeping vars for sending */
 		int chksum = 0;							/* Checksum */
@@ -116,6 +115,21 @@ int main(int argc, char *argv[])
 			perror("client bind");
 			exit(1);
 		}
+		
+		/* MASTER ACK SOCKET */
+		/* This creates a socket to communicate with the local ftps process */
+		if ((ackSock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			perror("ackSock socket");
+				exit(1);
+		}
+		bzero((char *)&masterAck, sizeof masterAck);
+		masterAck.sin_family = AF_INET;
+		masterAck.sin_addr.s_addr = inet_addr(ETA); /* let the kernel fill this in */
+		masterAck.sin_port = htons(10050);
+		if (bind(ackSock, (struct sockaddr *)&masterAck, sizeof masterAck) < 0) {
+			perror("ack bind");
+			exit(1);
+		}
 
 		/* SEND DATA TO TROLL */
 
@@ -135,19 +149,21 @@ int main(int argc, char *argv[])
         temp -> next = NULL;
 		int current = 0;
 		int next = 0;
+		int ack = 0;
 		
 		/* Begin send loop */
 		for(;;) {
 			
+				ack = 0;
 				/* Wait for data on socket from cleint */
 				if (FD_ISSET(local_sock, &selectmask)) {
-					
+				
 				/* Receive data from ftpc and copy to local buffer */
 				amtFromClient = recvfrom(local_sock, buffer, sizeof(buffer), MSG_WAITALL, NULL, NULL);
 				printf("Received data from client.\n");
 				
 				/* Copy from local buffer to circular buffer */
-				AddToBuffer(buffer);
+				AddToBuffer(buffer); // Add to c buffer
 				current = getStart();
 				next = getEnd();
 				printf("Copied data to buffer slot: %d\n", current);
@@ -162,11 +178,8 @@ int main(int argc, char *argv[])
 				ptr = findNode(temp, current);
 				int bytesToSend = ptr->bytes;
 				
-				/* Send ack to ftpc after data written to buffer */
-				sendto(local_sock, (char*)&ftpcAck, sizeof ftpcAck, 0, (struct sockaddr *)&clientack, sizeof clientack);
-				
 				/* Copy payload from circular buffer to tcpd packet */
-				bcopy(GetFromBuffer(), packet.body, bytesToSend);
+				bcopy(GetFromBuffer(), packet.body, bytesToSend); // removing from c buffer
 				printf("Copied data from buffer slot: %d\n", current);
 				
 				/* Prepare packet */
@@ -187,13 +200,34 @@ int main(int argc, char *argv[])
 				message.msg_header = destaddr;
 	
 				/* Send packet to troll */
+
 				amtToTroll = sendto(troll_sock, (char *)&message, sizeof message, 0, (struct sockaddr *)&trolladdr, sizeof trolladdr);
+
 				printf("Sent message to troll.\n\n");
 				if (amtToTroll != sizeof message) {
 					perror("totroll sendto");
 					exit(1);
 				}
-	
+				
+				/* Get ack */
+				recvfrom(ackSock, &ack, sizeof ack, MSG_WAITALL, NULL, NULL);				
+				printf("**Ack Recieved: %d**\n\n", ack);
+				
+				/* *******WE JUST GOT AN ACK HERE MUH DUDE!!!! DO RTT SHIT HERE YO *********/
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				/* Send ack to ftpc after data written to buffer */
+				sendto(local_sock, (char*)&ftpcAck, sizeof ftpcAck, 0, (struct sockaddr *)&clientack, sizeof clientack);
 				/* For bookkeeping/debugging */
 				total += amtToTroll;
 				packNo = packNo + 1;
@@ -223,7 +257,7 @@ int main(int argc, char *argv[])
 		int local_sock, ackSock; 					/* a socket to communicate with the client process */
 		MyMessage message, clientMessage; 					/* recieved packet from remote troll process */
 		Packet clientPacket;		
-		struct sockaddr_in trolladdr, localaddr, serveraddr, serverack;    /* Addresses */
+		struct sockaddr_in trolladdr, localaddr, serveraddr, serverack, masterAck;    /* Addresses */
 		struct hostent *host; 					/* Hostname identifier */
 		fd_set selectmask;					/* Socket descriptor for select */
 		int amtFromTcpd, amtToServer, len, total, amtToTcpd = 0; 		/* Bookkeeping vars */
@@ -286,6 +320,12 @@ int main(int argc, char *argv[])
 		servertrolladdr.sin_port = htons(SERVERTROLLPORT);
 		servertrolladdr.sin_addr.s_addr = inet_addr(BETA);
 		
+		/* MASTER ACK ADDRESS */
+		bzero((char *)&masterAck, sizeof masterAck);
+		masterAck.sin_family = AF_INET;
+		masterAck.sin_addr.s_addr = inet_addr(ETA); /* let the kernel fill this in */
+		masterAck.sin_port = htons(10050);
+		
 		/* RECEIVE DATA */
 
 		/* Initialize checksum table */		
@@ -320,16 +360,6 @@ int main(int argc, char *argv[])
 				}
 
 				printf("Recieved data from troll.\n");
-				
-				/* Prepare troll wrapper */
-				//bcopy(&recvMessage, &clientPacket.body, sizeof(clientPacket.body));
-				//clientPacket.packNo = message.msg_pack.packNo;
-				//clientMessage.msg_pack = clientPacket;
-				//clientMessage.msg_header = clientaddr;
-				
-				/* Send packet to troll */
-				//amtToTcpd = sendto(troll_sock, (char *)&clientMessage, sizeof clientMessage, 0, (struct sockaddr *)&servertrolladdr, sizeof servertrolladdr);
-				//usleep(1000);
 
 				/* get checksum from packet */
 				recv_chksum = message.msg_pack.chksum;
@@ -345,6 +375,10 @@ int main(int argc, char *argv[])
 				if (chksum != recv_chksum) {
 					printf("CHECKSUM ERROR: Expected: %X Actual: %X\n", recv_chksum, chksum);
 				}
+				
+				/* SEND ACK TO CLIENT TCPD */
+				int ack = 1;
+				sendto(local_sock, &ack, ack, 0, (struct sockaddr *)&masterAck, sizeof masterAck);
 
 				/* Add body to circular buffer */
 				AddToBuffer(message.msg_pack.body);
@@ -360,8 +394,6 @@ int main(int argc, char *argv[])
 				ptr = findNode(temp, current);
 				int bytesToSend = ptr->bytes;
 				
-				/* TODO send ack to client tcpd here */
-
 				/* Forward packet body to server */
 				amtToServer = sendto(local_sock, (char *)GetFromBuffer(), bytesToSend, 0, (struct sockaddr *)&destaddr, sizeof destaddr);
 				if (amtToServer < 0) {
@@ -372,10 +404,6 @@ int main(int argc, char *argv[])
 				printf("Copied data from buffer slot: %d\n", current);
 				printf("Sent data to server.\n\n");
 				
-				/* Get ack from ftps */
-				recvfrom(ackSock, &ftpsAck, sizeof(ftpsAck), MSG_WAITALL, NULL, NULL);
-				//printf("Ack Recieved: %d\n\n", ftpsAck);
-
 				/* Bookkeeping/Debugging */
 				total += amtFromTcpd;
 			}
