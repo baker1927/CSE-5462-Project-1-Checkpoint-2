@@ -216,12 +216,18 @@ int main(int argc, char *argv[])
 				/* *******WE JUST GOT AN ACK HERE MUH DUDE!!!! DO RTT SHIT HERE YO *********/
 				
 				
+				//find the node that represents the packet that was just acked
+				struct acked_node = findNode(head, ack.packNo);
 				
+				struct timespec endTime;
+				clock_gettime(CLOCK_REALTIME, &endTime);
+
+    			double elapsed = ( endTime.tv_sec - acked_node.time->.tv_sec )
+  				+ ( endTime.tv_nsec - acked_node.time->.tv_nsec )
+  				/ 1E9;
 				
-				
-				
-				
-				
+				calculate_rto(elapsed);
+				printf("JUST CALCULATED THE RTO. NEW RTO IS: %f\n", rto);
 				
 				
 				
